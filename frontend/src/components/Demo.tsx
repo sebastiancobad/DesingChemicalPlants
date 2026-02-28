@@ -2,34 +2,35 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { useScrollReveal } from "../hooks/useScrollReveal";
 import { Play, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Link } from "react-router-dom";
 
-interface SizeResult {
-  duty_w: number;
-  lmtd_k: number;
-  correction_factor_F: number;
-  area_provided_m2: number;
-  tube_count: number;
-  shell_id_m: number;
-  tube_length_m: number;
-  overdesign_pct: number;
-  hot_velocity_ms: number;
-  cold_velocity_ms: number;
+interface PipeResult {
+  nps: string;
+  schedule: string;
+  inner_diameter_mm: number;
+  velocity_ms: number;
+  reynolds: number;
+  friction_factor: number;
+  total_pressure_drop_kpa: number;
+  total_equivalent_length_m: number;
+  velocity_ok: boolean;
+  velocity_message: string;
   warnings: string[];
   standards_refs: string[];
 }
 
 const DEFAULT_INPUTS = {
-  T_h_in: "150",
-  T_h_out: "90",
-  T_c_in: "30",
-  T_c_out: "45",
+  mass_flow: "5.0",
+  density: "995",
+  viscosity: "0.001",
+  pipe_length: "100",
   m_dot_hot: "13.89",
 };
 
 export default function Demo() {
   const { ref, isVisible } = useScrollReveal(0.08);
   const [inputs, setInputs] = useState(DEFAULT_INPUTS);
-  const [result, setResult] = useState<SizeResult | null>(null);
+  const [result, setResult] = useState<PipeResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,19 +40,23 @@ export default function Demo() {
     setResult(null);
 
     try {
-      const resp = await fetch("/api/v1/hx/quick-size", {
+      const resp = await fetch("/api/v1/piping/size", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          T_h_in: parseFloat(inputs.T_h_in) + 273.15,
-          T_h_out: parseFloat(inputs.T_h_out) + 273.15,
-          T_c_in: parseFloat(inputs.T_c_in) + 273.15,
-          T_c_out: parseFloat(inputs.T_c_out) + 273.15,
-          m_dot_hot: parseFloat(inputs.m_dot_hot),
+          mass_flow_kgs: parseFloat(inputs.mass_flow),
+          density_kgm3: parseFloat(inputs.density),
+          viscosity_pas: parseFloat(inputs.viscosity),
+          pipe_length_m: parseFloat(inputs.pipe_length),
+          fluid_phase: "liquid",
+          fittings: { "90_elbow_std": 4, "gate_valve": 2 },
         }),
       });
 
-      if (!resp.ok) throw new Error(`API returned ${resp.status}`);
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => null);
+        throw new Error(errData?.detail || `API returned ${resp.status}`);
+      }
       setResult(await resp.json());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
@@ -61,11 +66,10 @@ export default function Demo() {
   };
 
   const inputFields = [
-    { key: "T_h_in", label: "Hot Inlet", unit: "°C" },
-    { key: "T_h_out", label: "Hot Outlet", unit: "°C" },
-    { key: "T_c_in", label: "Cold Inlet", unit: "°C" },
-    { key: "T_c_out", label: "Cold Outlet", unit: "°C" },
-    { key: "m_dot_hot", label: "Hot Flow", unit: "kg/s" },
+    { key: "mass_flow", label: "Mass Flow", unit: "kg/s" },
+    { key: "density", label: "Density", unit: "kg/m³" },
+    { key: "viscosity", label: "Viscosity", unit: "Pa·s" },
+    { key: "pipe_length", label: "Pipe Length", unit: "m" },
   ];
 
   return (
@@ -97,17 +101,17 @@ export default function Demo() {
               <div className="flex items-center gap-3">
                 <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
                 <span className="text-[13px] font-medium text-text-primary">
-                  Quick-Size Heat Exchanger
+                  Quick Pipe Sizing
                 </span>
               </div>
               <span className="text-[11px] font-mono text-text-tertiary">
-                POST /api/v1/hx/quick-size
+                POST /api/v1/piping/size
               </span>
             </div>
 
             <div className="p-6 lg:p-8">
               {/* Input grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
                 {inputFields.map((f) => (
                   <div key={f.key}>
                     <label className="block text-[11px] text-text-tertiary uppercase tracking-wider mb-1.5">
@@ -131,18 +135,26 @@ export default function Demo() {
               </div>
 
               {/* Run button */}
-              <button
-                onClick={handleRun}
-                disabled={loading}
-                className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold bg-accent text-[#050505] rounded-full hover:bg-accent-dim transition-all duration-300 hover:shadow-[0_0_24px_rgba(0,229,160,0.25)] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <Play size={14} />
-                )}
-                {loading ? "Computing..." : "Run Sizing"}
-              </button>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={handleRun}
+                  disabled={loading}
+                  className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold bg-accent text-[#050505] rounded-full hover:bg-accent-dim transition-all duration-300 hover:shadow-[0_0_24px_rgba(0,229,160,0.25)] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Play size={14} />
+                  )}
+                  {loading ? "Computing..." : "Size Pipe"}
+                </button>
+                <Link
+                  to="/modules/piping"
+                  className="text-[13px] text-accent hover:text-accent-dim transition-colors"
+                >
+                  Open full module →
+                </Link>
+              </div>
 
               {/* Error */}
               {error && (
@@ -163,14 +175,14 @@ export default function Demo() {
                   {/* Results grid */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border rounded-xl overflow-hidden border border-border">
                     {[
-                      { label: "Duty", value: `${(result.duty_w / 1e3).toFixed(0)} kW` },
-                      { label: "LMTD", value: `${result.lmtd_k.toFixed(1)} K` },
-                      { label: "Area", value: `${result.area_provided_m2.toFixed(1)} m²` },
-                      { label: "Tubes", value: `${result.tube_count}` },
-                      { label: "F-Factor", value: result.correction_factor_F.toFixed(3) },
-                      { label: "Shell ID", value: `${(result.shell_id_m * 1000).toFixed(0)} mm` },
-                      { label: "Length", value: `${result.tube_length_m.toFixed(2)} m` },
-                      { label: "Overdesign", value: `${result.overdesign_pct.toFixed(1)}%` },
+                      { label: "NPS", value: `${result.nps}"` },
+                      { label: "Schedule", value: result.schedule },
+                      { label: "Inner Dia.", value: `${result.inner_diameter_mm} mm` },
+                      { label: "Velocity", value: `${result.velocity_ms} m/s` },
+                      { label: "Reynolds", value: `${result.reynolds.toLocaleString()}` },
+                      { label: "Friction f", value: result.friction_factor.toFixed(5) },
+                      { label: "Total ΔP", value: `${result.total_pressure_drop_kpa} kPa` },
+                      { label: "Eq. Length", value: `${result.total_equivalent_length_m} m` },
                     ].map((item) => (
                       <div
                         key={item.label}
@@ -218,6 +230,27 @@ export default function Demo() {
                 </motion.div>
               )}
             </div>
+          </div>
+
+          {/* Module links grid */}
+          <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: "Heat Exchanger", href: "/modules/heat-exchanger" },
+              { label: "Pump Sizing", href: "/modules/pump" },
+              { label: "Phase Separator", href: "/modules/separator" },
+              { label: "Materials", href: "/modules/materials" },
+              { label: "Plant Layout", href: "/modules/layout" },
+              { label: "Economics", href: "/modules/economics" },
+              { label: "Piping", href: "/modules/piping" },
+            ].map((m) => (
+              <Link
+                key={m.href}
+                to={m.href}
+                className="px-4 py-3 text-[13px] text-center text-text-secondary hover:text-text-primary border border-border rounded-xl hover:border-accent/30 hover:bg-white/[0.02] transition-all"
+              >
+                {m.label}
+              </Link>
+            ))}
           </div>
         </motion.div>
       </div>
