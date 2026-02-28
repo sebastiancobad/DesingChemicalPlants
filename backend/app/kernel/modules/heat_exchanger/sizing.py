@@ -70,14 +70,14 @@ def lmtd_counterflow(T_h_in: float, T_h_out: float, T_c_in: float, T_c_out: floa
     dT1 = T_h_in - T_c_out
     dT2 = T_h_out - T_c_in
 
-    if abs(dT1 - dT2) < 0.01:
-        return (dT1 + dT2) / 2.0
-
     if dT1 <= 0 or dT2 <= 0:
         raise ValueError(
             f"Temperature cross detected: ΔT1={dT1:.1f}, ΔT2={dT2:.1f}. "
             "Check inlet/outlet assignments."
         )
+
+    if abs(dT1 - dT2) < 0.01:
+        return (dT1 + dT2) / 2.0
 
     return (dT1 - dT2) / math.log(dT1 / dT2)
 
@@ -92,23 +92,39 @@ def correction_factor_1_2(R: float, P: float) -> float:
         (T_h_in - T_h_out) / (T_c_out - T_c_in)
     P : float
         (T_c_out - T_c_in) / (T_h_in - T_c_in)
+
+    Uses the standard Bowman-Mueller-Nagle analytical expression.
     """
+    if P < 1e-10:
+        return 1.0  # no heat transfer
+
     if abs(R - 1.0) < 1e-6:
         # Special case: R = 1
-        F = (P * math.sqrt(2.0)) / (
-            (1.0 - P) * math.log((2.0 - P * (2.0 - math.sqrt(2.0))) /
-                                  (2.0 - P * (2.0 + math.sqrt(2.0))))
-        )
+        # F = [P√2 / (1-P)] / ln[(2-P(2-√2)) / (2-P(2+√2))]
+        sqrt2 = math.sqrt(2.0)
+        numer_arg = (2.0 - P * (2.0 - sqrt2)) / (2.0 - P * (2.0 + sqrt2))
+        if numer_arg <= 0:
+            return 0.75
+        F = (P * sqrt2 / (1.0 - P)) / math.log(numer_arg)
         return max(min(F, 1.0), 0.5)
 
-    S = math.sqrt(R * R + 1.0) / (R - 1.0)
-    W = ((1.0 - P * R) / (1.0 - P))
+    # General case
+    sqrt_term = math.sqrt(R * R + 1.0)
 
+    W = (1.0 - P * R) / (1.0 - P)
     if W <= 0:
-        return 0.75  # degenerate case — flag as warning
+        return 0.75  # degenerate — thermodynamically infeasible
 
-    num = S * math.log(W)
-    denom = math.log((2.0 / P - 1.0 - R + S) / (2.0 / P - 1.0 - R - S))
+    # F = [√(R²+1) · ln((1-P)/(1-PR))] / [(R-1) · ln((2/P - 1 - R + √(R²+1)) / (2/P - 1 - R - √(R²+1)))]
+    num = sqrt_term * math.log((1.0 - P) / (1.0 - P * R))
+
+    A = 2.0 / P - 1.0 - R
+    denom_arg = (A + sqrt_term) / (A - sqrt_term)
+
+    if denom_arg <= 0:
+        return 0.75
+
+    denom = (R - 1.0) * math.log(denom_arg)
 
     if abs(denom) < 1e-10:
         return 0.75
@@ -152,6 +168,7 @@ def kern_shell_side_htc(
     mu: float,          # Pa·s
     cp: float,          # J/(kg·K)
     k: float,           # W/(m·K)
+    rho: float = 800.0, # kg/m³ shell-side fluid density
     mu_w: float = None, # Pa·s at wall temperature (optional)
 ) -> tuple[float, float, float]:
     """Shell-side heat transfer coefficient by Kern method.
@@ -170,7 +187,7 @@ def kern_shell_side_htc(
         raise ValueError("Cross-flow area is non-positive; check geometry")
 
     Gs = m_dot / As  # mass velocity [kg/(m²·s)]
-    velocity = Gs / 800.0  # approximate density for velocity estimate
+    velocity = Gs / rho
     Re = Gs * De / mu
 
     Pr = cp * mu / k
@@ -399,7 +416,7 @@ def quick_size(
     # --- Shell-side HTC (hot fluid on shell) ---
     h_shell, Re_shell, v_shell = kern_shell_side_htc(
         m_dot_hot, shell_id, baffle_spacing, tube_od, tube_pitch,
-        mu_hot, cp_hot, k_hot,
+        mu_hot, cp_hot, k_hot, rho=rho_hot,
     )
     refs.extend(kern_shell_side_htc.__standards_refs__)
 

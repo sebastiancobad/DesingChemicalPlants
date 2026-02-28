@@ -221,9 +221,11 @@ def equipment_capex(
         else:
             Fp = 1.0
 
-    # --- Bare module cost ---
+    # --- Bare module cost (Turton Eq. 7.7) ---
+    # C_BM = Cp° * (B1 + B2·Fm·Fp)  — simplified as Cp° * Fbm when Fm=Fp=1
+    # For non-CS or elevated pressure: C_BM = Cp° * (Fbm + Fm·Fp - 1)
     Fbm = corr.fbm_base
-    Cbm_base = Cp0 * (Fbm * Fm * Fp)
+    Cbm_base = Cp0 * (Fbm + Fm * Fp - 1.0)
 
     # --- CEPCI escalation ---
     escalation = target_cepci / base_cepci

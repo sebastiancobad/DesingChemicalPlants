@@ -27,8 +27,9 @@ class TestLMTD:
             T_h_in=423.15, T_h_out=363.15,  # 150°C → 90°C
             T_c_in=303.15, T_c_out=318.15,  # 30°C → 45°C
         )
-        # Expected: (105 - 45) / ln(105/45) ≈ 71.7 K
-        assert 70.0 < lmtd < 80.0
+        # dT1 = 423.15 - 318.15 = 105, dT2 = 363.15 - 303.15 = 60
+        # LMTD = (105 - 60) / ln(105/60) ≈ 80.4 K
+        assert 78.0 < lmtd < 83.0
 
     def test_equal_delta_t(self):
         """When ΔT1 ≈ ΔT2, LMTD should return arithmetic mean."""

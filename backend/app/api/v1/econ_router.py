@@ -15,7 +15,9 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter
 
+from app.core.units import EngineeringValue
 from app.kernel.modules.economics.cost_engine import (
+    COST_CORRELATIONS,
     equipment_capex,
     evaluate_opex,
     project_capex,
@@ -50,19 +52,15 @@ async def calc_equipment_capex(req: EquipmentCapexRequest) -> EquipmentCapexResp
     # Determine the capacity value based on equipment type
     capacity = 0.0
     if sp.heat_transfer_area:
-        from app.core.units import EngineeringValue
         capacity = EngineeringValue(sp.heat_transfer_area.value, sp.heat_transfer_area.unit).to_si().value
     elif sp.power:
-        from app.core.units import EngineeringValue
         capacity = EngineeringValue(sp.power.value, sp.power.unit).to_si().value / 1e3  # kW
     elif sp.volume:
-        from app.core.units import EngineeringValue
         capacity = EngineeringValue(sp.volume.value, sp.volume.unit).to_si().value
 
     # Design pressure in barg
     dp_barg = 10.0
     if sp.design_pressure:
-        from app.core.units import EngineeringValue
         dp_pa = EngineeringValue(sp.design_pressure.value, sp.design_pressure.unit).to_si().value
         dp_barg = (dp_pa - 101325.0) / 1e5
 
@@ -89,7 +87,11 @@ async def calc_equipment_capex(req: EquipmentCapexRequest) -> EquipmentCapexResp
     six_tenths = None
     if result.six_tenths_cost is not None:
         six_tenths = SixTenthsCheck(
-            reference_capacity=ValueWithUnit(value=capacity, unit="m²"),
+            reference_capacity=ValueWithUnit(
+                value=capacity,
+                unit=COST_CORRELATIONS.get(req.equipment_type).capacity_unit
+                if req.equipment_type in COST_CORRELATIONS else "m²",
+            ),
             reference_cost=ValueWithUnit(value=round(result.base_cost_usd, 0), unit="USD"),
             exponent=result.six_tenths_exponent or 0.6,
             scaled_cost=ValueWithUnit(value=round(result.six_tenths_cost, 0), unit="USD"),
