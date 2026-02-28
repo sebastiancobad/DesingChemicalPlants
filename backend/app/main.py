@@ -10,6 +10,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.econ_router import router as econ_router
 from app.api.v1.hx_router import router as hx_router
+from app.api.v1.piping_router import router as piping_router
+from app.api.v1.pump_router import router as pump_router
+from app.api.v1.separator_router import router as separator_router
+from app.api.v1.materials_router import router as materials_router
+from app.api.v1.layout_router import router as layout_router
 
 app = FastAPI(
     title="ChemScale",
@@ -34,6 +39,11 @@ app.add_middleware(
 # Register routers
 app.include_router(hx_router)
 app.include_router(econ_router)
+app.include_router(piping_router)
+app.include_router(pump_router)
+app.include_router(separator_router)
+app.include_router(materials_router)
+app.include_router(layout_router)
 
 
 @app.get("/health")

@@ -1,17 +1,30 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X } from "lucide-react";
+import { Menu, X, ChevronDown } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
 
 const NAV_LINKS = [
-  { label: "Platform", href: "#platform" },
-  { label: "Modules", href: "#modules" },
-  { label: "Standards", href: "#standards" },
-  { label: "Architecture", href: "#architecture" },
+  { label: "Platform", href: "/#platform" },
+  { label: "Standards", href: "/#standards" },
+  { label: "Architecture", href: "/#architecture" },
+];
+
+const MODULE_LINKS = [
+  { label: "Heat Exchanger", href: "/modules/heat-exchanger", number: "01" },
+  { label: "Piping & Pipeline", href: "/modules/piping", number: "02" },
+  { label: "Pump Sizing", href: "/modules/pump", number: "03" },
+  { label: "Phase Separator", href: "/modules/separator", number: "04" },
+  { label: "Material Selection", href: "/modules/materials", number: "05" },
+  { label: "Plant Layout", href: "/modules/layout", number: "06" },
+  { label: "Economic Evaluation", href: "/modules/economics", number: "07" },
 ];
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [modulesOpen, setModulesOpen] = useState(false);
+  const location = useLocation();
+  const isLanding = location.pathname === "/";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -32,7 +45,7 @@ export default function Navbar() {
     >
       <nav className="mx-auto max-w-7xl px-6 lg:px-10 flex items-center justify-between h-16 lg:h-18">
         {/* Logo */}
-        <a href="#" className="flex items-center gap-3 group">
+        <Link to="/" className="flex items-center gap-3 group">
           <div className="relative w-8 h-8 flex items-center justify-center">
             <div className="absolute inset-0 bg-accent/20 rounded-lg blur-md group-hover:bg-accent/30 transition-colors duration-500" />
             <svg viewBox="0 0 32 32" className="relative w-6 h-6" fill="none">
@@ -54,29 +67,65 @@ export default function Navbar() {
           <span className="text-[15px] font-semibold tracking-tight text-text-primary">
             Chem<span className="text-accent">Scale</span>
           </span>
-        </a>
+        </Link>
 
         {/* Desktop nav */}
         <div className="hidden md:flex items-center gap-1">
-          {NAV_LINKS.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="px-4 py-2 text-[13px] text-text-secondary hover:text-text-primary transition-colors duration-300 rounded-lg hover:bg-white/[0.03]"
-            >
-              {link.label}
-            </a>
-          ))}
+          {isLanding &&
+            NAV_LINKS.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="px-4 py-2 text-[13px] text-text-secondary hover:text-text-primary transition-colors duration-300 rounded-lg hover:bg-white/[0.03]"
+              >
+                {link.label}
+              </a>
+            ))}
+
+          {/* Modules dropdown */}
+          <div
+            className="relative"
+            onMouseEnter={() => setModulesOpen(true)}
+            onMouseLeave={() => setModulesOpen(false)}
+          >
+            <button className="flex items-center gap-1 px-4 py-2 text-[13px] text-text-secondary hover:text-text-primary transition-colors duration-300 rounded-lg hover:bg-white/[0.03]">
+              Modules <ChevronDown size={14} />
+            </button>
+            <AnimatePresence>
+              {modulesOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute top-full left-0 mt-1 w-64 bg-surface border border-border rounded-xl overflow-hidden shadow-2xl"
+                >
+                  {MODULE_LINKS.map((mod) => (
+                    <Link
+                      key={mod.href}
+                      to={mod.href}
+                      className="flex items-center gap-3 px-4 py-3 text-[13px] text-text-secondary hover:text-text-primary hover:bg-white/[0.03] transition-colors"
+                    >
+                      <span className="text-[10px] font-mono text-text-tertiary w-5">
+                        {mod.number}
+                      </span>
+                      {mod.label}
+                    </Link>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
 
         {/* CTA + Mobile toggle */}
         <div className="flex items-center gap-3">
-          <a
-            href="#demo"
+          <Link
+            to="/modules/heat-exchanger"
             className="hidden md:inline-flex items-center gap-2 px-5 py-2 text-[13px] font-medium bg-accent text-[#050505] rounded-full hover:bg-accent-dim transition-all duration-300 hover:shadow-[0_0_24px_rgba(0,229,160,0.25)]"
           >
             Launch App
-          </a>
+          </Link>
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
             className="md:hidden p-2 text-text-secondary hover:text-text-primary transition-colors"
@@ -97,23 +146,44 @@ export default function Navbar() {
             className="md:hidden overflow-hidden bg-[#050505]/95 backdrop-blur-xl border-b border-white/[0.04]"
           >
             <div className="px-6 py-4 flex flex-col gap-1">
-              {NAV_LINKS.map((link) => (
-                <a
-                  key={link.href}
-                  href={link.href}
+              <div className="text-[10px] font-mono text-text-tertiary uppercase tracking-wider px-4 py-2">
+                Modules
+              </div>
+              {MODULE_LINKS.map((mod) => (
+                <Link
+                  key={mod.href}
+                  to={mod.href}
                   onClick={() => setMobileOpen(false)}
-                  className="px-4 py-3 text-sm text-text-secondary hover:text-text-primary transition-colors rounded-lg hover:bg-white/[0.03]"
+                  className="flex items-center gap-3 px-4 py-3 text-sm text-text-secondary hover:text-text-primary transition-colors rounded-lg hover:bg-white/[0.03]"
                 >
-                  {link.label}
-                </a>
+                  <span className="text-[10px] font-mono text-text-tertiary w-5">
+                    {mod.number}
+                  </span>
+                  {mod.label}
+                </Link>
               ))}
-              <a
-                href="#demo"
+              {isLanding && (
+                <>
+                  <div className="w-full h-px bg-border my-2" />
+                  {NAV_LINKS.map((link) => (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setMobileOpen(false)}
+                      className="px-4 py-3 text-sm text-text-secondary hover:text-text-primary transition-colors rounded-lg hover:bg-white/[0.03]"
+                    >
+                      {link.label}
+                    </a>
+                  ))}
+                </>
+              )}
+              <Link
+                to="/modules/heat-exchanger"
                 onClick={() => setMobileOpen(false)}
                 className="mt-2 flex items-center justify-center gap-2 px-5 py-3 text-sm font-medium bg-accent text-[#050505] rounded-full"
               >
                 Launch App
-              </a>
+              </Link>
             </div>
           </motion.div>
         )}
